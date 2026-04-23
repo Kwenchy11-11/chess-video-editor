@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { GameData, Player } from '../lib/types';
+import { GameData } from '../lib/types';
 
 export function useChessAPI(url: string) {
   const [gameData, setGameData] = useState<GameData | null>(null);

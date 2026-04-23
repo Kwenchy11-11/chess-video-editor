@@ -11,6 +11,7 @@ interface ChessPieceProps {
   targetX?: number;
   targetY?: number;
   progress?: number; // 0-1 for animation
+  opacity?: number; // For capture fade-out effect
 }
 
 export const ChessPiece: React.FC<ChessPieceProps> = ({
@@ -21,6 +22,7 @@ export const ChessPiece: React.FC<ChessPieceProps> = ({
   targetX,
   targetY,
   progress = 0,
+  opacity = 1,
 }) => {
   const pieceSrc = getPieceSvg(piece);
   
@@ -46,14 +48,16 @@ export const ChessPiece: React.FC<ChessPieceProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         pointerEvents: 'none',
-        zIndex: isAnimating ? 10 : 1,
+        zIndex: isAnimating ? 20 : 10,
+        opacity,
       }}
     >
       <Img
         src={pieceSrc}
         style={{
-          width: SQUARE_SIZE * 0.9,
-          height: SQUARE_SIZE * 0.9,
+          width: SQUARE_SIZE * 0.85,
+          height: SQUARE_SIZE * 0.85,
+          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))',
         }}
       />
     </div>
