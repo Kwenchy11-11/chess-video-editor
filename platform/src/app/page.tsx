@@ -378,17 +378,28 @@ function parsePGNData(pgn: string) {
   const timeControlMatch = pgn.match(/\[TimeControl "([^"]+)"\]/);
   const eventMatch = pgn.match(/\[Event "([^"]+)"\]/);
   
-  // Parse TimeControl to determine game type
+  // Parse TimeControl to determine game type and format
   let gameType = 'Standard';
+  let timeDisplay = '';
+  
   if (timeControlMatch) {
     const tc = timeControlMatch[1];
-    if (tc.includes('180') || tc.includes('300')) {
-      gameType = '⚡ Blitz';
-    } else if (tc.includes('600') || tc.includes('900') || tc.includes('1200')) {
-      gameType = '⏱️ Rapid';
-    } else if (tc.includes('60') || tc.includes('30')) {
+    // Parse time control like "180+2" or "600+5"
+    const [seconds, increment] = tc.split('+');
+    const minutes = Math.floor(parseInt(seconds) / 60);
+    const inc = increment ? parseInt(increment) : 0;
+    
+    timeDisplay = inc > 0 ? `${minutes}+${inc}` : `${minutes}`;
+    
+    // Determine game type
+    const totalSeconds = parseInt(seconds);
+    if (totalSeconds <= 180) {
       gameType = '🔥 Bullet';
-    } else if (tc.includes('86400') || tc.includes('43200')) {
+    } else if (totalSeconds <= 600) {
+      gameType = '⚡ Blitz';
+    } else if (totalSeconds <= 1800) {
+      gameType = '⏱️ Rapid';
+    } else if (totalSeconds >= 86400) {
       gameType = '📅 Daily';
     }
   }
@@ -429,7 +440,7 @@ function parsePGNData(pgn: string) {
     opening: openingMatch ? openingMatch[1] : undefined,
     result: resultMatch ? resultMatch[1] : '*',
     gameType,
-    timeControl: timeControlMatch ? timeControlMatch[1] : undefined,
+    timeControl: timeDisplay || (timeControlMatch ? timeControlMatch[1] : undefined),
     pgn,
   };
 }
