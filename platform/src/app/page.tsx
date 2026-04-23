@@ -4,6 +4,8 @@ import { useState } from 'react';
 
 export default function Home() {
   const [url, setUrl] = useState('');
+  const [pgn, setPgn] = useState('');
+  const [mode, setMode] = useState<'url' | 'pgn'>('url');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -17,19 +19,48 @@ export default function Home() {
     setResult(null);
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
+      let gameData;
+      
+      if (mode === 'pgn') {
+        // Parse PGN directly
+        if (!pgn.trim()) {
+          throw new Error('Please enter PGN');
+        }
+        gameData = parsePGNData(pgn);
+      } else {
+        // Try to fetch from URL
+        const response = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+        });
 
-      if (!response.ok) {
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to prepare game data');
+        }
+
         const data = await response.json();
-        throw new Error(data.error || 'Failed to prepare game data');
+        gameData = data.gameData;
       }
 
-      const data = await response.json();
-      setResult(data);
+      // Save game data via API
+      const saveResponse = await fetch('/api/save-game', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameData }),
+      });
+
+      if (!saveResponse.ok) {
+        throw new Error('Failed to save game data');
+      }
+
+      const saveData = await saveResponse.json();
+      
+      setResult({
+        ...saveData,
+        gameData,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -38,13 +69,12 @@ export default function Home() {
   };
 
   const handleRender = async () => {
-    if (!result?.renderCommand) return;
+    if (!result?.gameId) return;
     
     setRendering(true);
     setRenderOutput('⏳ กำลังสร้างวิดีโอ... อาจใช้เวลา 1-2 นาที\n');
     
     try {
-      // Execute render command
       const response = await fetch('/api/render', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -58,7 +88,6 @@ export default function Home() {
       const data = await response.json();
       setRenderOutput(prev => prev + '\n✅ สร้างวิดีโอสำเร็จ!\n');
       
-      // Update result with video URL
       setResult((prev: any) => ({
         ...prev,
         videoUrl: data.videoUrl,
@@ -99,33 +128,86 @@ export default function Home() {
           color: '#888',
           marginBottom: '40px',
         }}>
-          ใส่ลิงค์เกม Chess.com แล้วกดสร้างคลิปสำหรับ TikTok
+          สร้างคลิป TikTok จากเกมหมากรุก
         </p>
+
+        {/* Mode Toggle */}
+        <div style={{
+          display: 'flex',
+          gap: '10px',
+          marginBottom: '30px',
+          justifyContent: 'center',
+        }}>
+          <button
+            onClick={() => setMode('url')}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: mode === 'url' ? '#7cb342' : '#333',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            🔗 ใช้ URL
+          </button>
+          <button
+            onClick={() => setMode('pgn')}
+            style={{
+              padding: '12px 24px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: mode === 'pgn' ? '#7cb342' : '#333',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            📋 ใช้ PGN
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} style={{
           display: 'flex',
           flexDirection: 'column',
           gap: '20px',
         }}>
-          <input
-            type="url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://www.chess.com/game/live/148557015936"
-            required
-            style={{
-              padding: '16px 20px',
-              fontSize: '16px',
-              borderRadius: '12px',
-              border: '2px solid #333',
-              backgroundColor: '#0f0f23',
-              color: '#fff',
-              outline: 'none',
-              transition: 'border-color 0.2s',
-            }}
-            onFocus={(e) => e.target.style.borderColor = '#7cb342'}
-            onBlur={(e) => e.target.style.borderColor = '#333'}
-          />
+          {mode === 'url' ? (
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://www.chess.com/game/live/148557015936"
+              style={{
+                padding: '16px 20px',
+                fontSize: '16px',
+                borderRadius: '12px',
+                border: '2px solid #333',
+                backgroundColor: '#0f0f23',
+                color: '#fff',
+                outline: 'none',
+              }}
+            />
+          ) : (
+            <textarea
+              value={pgn}
+              onChange={(e) => setPgn(e.target.value)}
+              placeholder="[White &quot;Player1&quot;][Black &quot;Player2&quot;] 1. e4 e5 2. Nf3 Nc6..."
+              rows={6}
+              style={{
+                padding: '16px 20px',
+                fontSize: '14px',
+                borderRadius: '12px',
+                border: '2px solid #333',
+                backgroundColor: '#0f0f23',
+                color: '#fff',
+                outline: 'none',
+                fontFamily: 'monospace',
+                resize: 'vertical',
+              }}
+            />
+          )}
 
           <button
             type="submit"
@@ -139,7 +221,6 @@ export default function Home() {
               backgroundColor: loading ? '#555' : '#7cb342',
               color: '#fff',
               cursor: loading ? 'not-allowed' : 'pointer',
-              transition: 'transform 0.2s, background-color 0.2s',
             }}
           >
             {loading ? '⏳ กำลังเตรียมข้อมูล...' : '📥 เตรียมข้อมูลเกม'}
@@ -218,33 +299,10 @@ export default function Home() {
                     overflow: 'auto',
                     maxHeight: '200px',
                     whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-all',
                   }}>
                     {renderOutput}
                   </pre>
                 )}
-
-                <div style={{
-                  marginTop: '20px',
-                  padding: '16px',
-                  backgroundColor: '#00000055',
-                  borderRadius: '8px',
-                }}>
-                  <p style={{ color: '#888', fontSize: '14px', marginBottom: '8px' }}>
-                    หรือรันคำสั่งนี้ใน Terminal:
-                  </p>
-                  <code style={{
-                    display: 'block',
-                    padding: '12px',
-                    backgroundColor: '#1a1a2e',
-                    borderRadius: '6px',
-                    color: '#7cb342',
-                    fontSize: '12px',
-                    wordBreak: 'break-all',
-                  }}>
-                    {result.renderCommand}
-                  </code>
-                </div>
               </>
             ) : (
               <div style={{
@@ -285,17 +343,57 @@ export default function Home() {
           borderRadius: '12px',
           textAlign: 'left',
         }}>
-          <h3 style={{ color: '#fff', marginBottom: '12px' }}>📋 วิธีใช้:</h3>
+          <h3 style={{ color: '#fff', marginBottom: '12px' }}>📋 วิธีใช้ (แบบ PGN - แนะนำ):</h3>
           <ol style={{ color: '#aaa', lineHeight: '1.8', paddingLeft: '20px' }}>
             <li>เข้าไปที่ <a href="https://chess.com" target="_blank" style={{ color: '#7cb342' }}>Chess.com</a></li>
-            <li>เปิดเกมที่ต้องการ (ต้องเป็นเกม public)</li>
-            <li>คัดลอก URL จาก address bar</li>
-            <li>วางลงในช่องด้านบน แล้วกด "เตรียมข้อมูลเกม"</li>
-            <li>กด "สร้างวิดีโอ" และรอ 1-2 นาที</li>
-            <li>ดาวน์โหลดและอัพโหลดลง TikTok!</li>
+            <li>เปิดเกมที่ต้องการ</li>
+            <li>กดปุ่ม "Share" หรือ "Download PGN"</li>
+            <li>คัดลอก PGN ที่ได้</li>
+            <li>กลับมาที่นี่ เลือก "ใช้ PGN" แล้ววาง</li>
+            <li>กด "เตรียมข้อมูลเกม" แล้ว "สร้างวิดีโอ"</li>
           </ol>
         </div>
       </div>
     </main>
   );
+}
+
+// Parse PGN data on client side
+function parsePGNData(pgn: string) {
+  // Extract headers
+  const whiteMatch = pgn.match(/\[White "([^"]+)"\]/);
+  const blackMatch = pgn.match(/\[Black "([^"]+)"\]/);
+  const whiteEloMatch = pgn.match(/\[WhiteElo "(\d+)"\]/);
+  const blackEloMatch = pgn.match(/\[BlackElo "(\d+)"\]/);
+  const openingMatch = pgn.match(/\[Opening "([^"]+)"\]/);
+  const resultMatch = pgn.match(/\[Result "([^"]+)"\]/);
+  
+  // Remove headers to get moves
+  const movesText = pgn.replace(/\[.*?\]/g, '').trim();
+  
+  // Parse moves
+  const moves = movesText
+    .replace(/\d+\./g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(m => m && !['1-0', '0-1', '1/2-1/2', '*'].includes(m));
+  
+  return {
+    id: 'pgn-' + Date.now(),
+    white: {
+      username: whiteMatch ? whiteMatch[1] : 'White',
+      rating: whiteEloMatch ? parseInt(whiteEloMatch[1]) : 0,
+      color: 'white',
+    },
+    black: {
+      username: blackMatch ? blackMatch[1] : 'Black',
+      rating: blackEloMatch ? parseInt(blackEloMatch[1]) : 0,
+      color: 'black',
+    },
+    moves,
+    opening: openingMatch ? openingMatch[1] : undefined,
+    result: resultMatch ? resultMatch[1] : '*',
+    pgn,
+  };
 }
