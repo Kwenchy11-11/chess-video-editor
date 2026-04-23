@@ -259,7 +259,7 @@ export default function Home() {
                 <strong style={{ color: '#fff' }}>ผู้เล่นดำ:</strong> {result.gameData.black.username} ({result.gameData.black.rating})
               </p>
               <p style={{ color: '#aaa', marginBottom: '8px' }}>
-                <strong style={{ color: '#fff' }}>จำนวน moves:</strong> {result.gameData.moves.length}
+                <strong style={{ color: '#fff' }}>จำนวน moves:</strong> {Math.ceil(result.gameData.moves.length / 2)} (ทั้งหมด {result.gameData.moves.length} ครั้งเดิน)
               </p>
               {result.gameData.opening && (
                 <p style={{ color: '#aaa' }}>
