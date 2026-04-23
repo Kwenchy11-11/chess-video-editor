@@ -1,5 +1,5 @@
 import { Chess } from 'chess.js';
-import { MoveAnalysis, GameAnalysis, MoveClassification } from './types';
+import { MoveAnalysis, GameAnalysis, MoveClassification, GameData } from './types';
 
 // Stockfish WASM engine wrapper
 let stockfishEngine: any = null;
@@ -25,6 +25,176 @@ export async function initStockfish(): Promise<any> {
     console.error('Failed to initialize Stockfish:', error);
     throw error;
   }
+}
+
+// Simple heuristic-based analysis for when Stockfish is not available
+// This provides immediate feedback without async engine calls
+export function analyzeGameHeuristic(gameData: GameData): GameAnalysis {
+  const chess = new Chess();
+  const moves: MoveAnalysis[] = [];
+  const whiteLosses: number[] = [];
+  const blackLosses: number[] = [];
+  
+  for (let i = 0; i < gameData.moves.length; i++) {
+    const san = gameData.moves[i];
+    const isWhiteMove = i % 2 === 0;
+    
+    // Make the move
+    const move = chess.move(san);
+    if (!move) continue;
+    
+    // Simple heuristic classification
+    const classification = classifyMoveHeuristic(move, i, chess);
+    
+    // Estimate centipawn loss based on classification
+    const centipawnLoss = estimateCentipawnLoss(classification);
+    
+    // Estimate evaluation (simplified)
+    const evaluation = estimateEvaluation(chess, isWhiteMove);
+    
+    moves.push({
+      moveIndex: i,
+      san,
+      classification,
+      evaluation,
+      centipawnLoss,
+      bestMove: san, // In heuristic mode, assume played move is best
+    });
+    
+    // Track losses
+    if (isWhiteMove) {
+      whiteLosses.push(centipawnLoss);
+    } else {
+      blackLosses.push(centipawnLoss);
+    }
+  }
+  
+  return {
+    moves,
+    whiteAccuracy: calculateAccuracy(whiteLosses),
+    blackAccuracy: calculateAccuracy(blackLosses),
+  };
+}
+
+// Heuristic-based move classification
+function classifyMoveHeuristic(
+  move: any,
+  moveIndex: number,
+  chess: Chess
+): MoveClassification {
+  const isCapture = !!move.captured;
+  const isCheck = chess.isCheck();
+  const isCheckmate = chess.isCheckmate();
+  const isCastle = move.flags.includes('k') || move.flags.includes('q');
+  
+  // Book moves (first 15 moves, especially 1-10)
+  if (moveIndex < 10) {
+    return 'book';
+  }
+  if (moveIndex < 20 && !isCapture && !isCheck) {
+    return 'book';
+  }
+  
+  // Checkmate is always best
+  if (isCheckmate) {
+    return 'best';
+  }
+  
+  // Brilliant: sacrifice that leads to check or complex position
+  if (isCapture && isCheck && moveIndex > 10) {
+    // Check if it's a sacrifice (capturing lower value piece)
+    const pieceValues: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+    if (move.captured && pieceValues[move.captured] < pieceValues[move.piece]) {
+      return 'brilliant';
+    }
+    return 'great';
+  }
+  
+  // Great move: check with capture or castle
+  if (isCheck && isCapture) {
+    return 'great';
+  }
+  
+  // Castle is generally excellent in opening/middlegame
+  if (isCastle && moveIndex < 30) {
+    return 'excellent';
+  }
+  
+  // Capture with check
+  if (isCapture && isCheck) {
+    return 'excellent';
+  }
+  
+  // Good captures
+  if (isCapture) {
+    const pieceValues: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+    const capturedValue = pieceValues[move.captured] || 0;
+    const attackerValue = pieceValues[move.piece] || 0;
+    
+    // Capturing higher or equal value is good
+    if (capturedValue >= attackerValue) {
+      return 'good';
+    }
+    
+    // Capturing pawn with piece might be inaccuracy
+    if (capturedValue === 1 && attackerValue > 3) {
+      return 'inaccuracy';
+    }
+    
+    return 'good';
+  }
+  
+  // Check without capture is good
+  if (isCheck) {
+    return 'good';
+  }
+  
+  // Default to good for most moves
+  return 'good';
+}
+
+// Estimate centipawn loss from classification
+function estimateCentipawnLoss(classification: MoveClassification): number {
+  const estimates: Record<MoveClassification, number> = {
+    'brilliant': 0,
+    'best': 0,
+    'great': 20,
+    'excellent': 30,
+    'good': 60,
+    'book': 10,
+    'inaccuracy': 150,
+    'mistake': 400,
+    'blunder': 600,
+    'miss': 300,
+  };
+  return estimates[classification] || 50;
+}
+
+// Estimate position evaluation (simplified)
+function estimateEvaluation(chess: Chess, isWhiteMove: boolean): number {
+  // Simple material count
+  const board = chess.board();
+  let whiteMaterial = 0;
+  let blackMaterial = 0;
+  
+  const pieceValues: Record<string, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 0 };
+  
+  for (let y = 0; y < 8; y++) {
+    for (let x = 0; x < 8; x++) {
+      const piece = board[y][x];
+      if (piece) {
+        const value = pieceValues[piece.type] || 0;
+        if (piece.color === 'w') {
+          whiteMaterial += value;
+        } else {
+          blackMaterial += value;
+        }
+      }
+    }
+  }
+  
+  // Return evaluation from white's perspective
+  return whiteMaterial - blackMaterial;
 }
 
 // Evaluate a single position (FEN)
