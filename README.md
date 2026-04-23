@@ -6,10 +6,13 @@
 
 - ✅ ดึงเกมจาก Chess.com URL อัตโนมัติ
 - ✅ สร้างวิดีโอ TikTok format (9:16 - 1080x1920)
-- ✅ Animation หมากเดิน smooth
+- ✅ **Animation หมากเดิน smooth** พร้อมปรับความเร็วได้ (slow/medium/fast)
+- ✅ **สไตล์ Minimal Clean** - ดูสะอาด ไม่บังบอร์ด
+- ✅ **Checkmate/Winner indicators** บนช่องกษัตริย์ (เหมือน Chess.com)
+- ✅ **Capture animation** แบบ fade-out (เหมือน Chess.com)
+- ✅ **Highlight moves** หลังเดินเสร็จ (เหมือน Chess.com)
 - ✅ แสดงชื่อผู้เล่น, ELO, Opening
 - ✅ Moves list แบบ scrollable
-- ✅ Highlight moves + ลูกศรชี้การเดิน
 - ✅ Web Platform ใช้งานง่าย
 
 ## 🚀 วิธีใช้งาน
@@ -58,6 +61,21 @@ chess-video-editor/
 └── README.md
 ```
 
+## 🎭 Style System
+
+รองรับหลายสไตล์สำหรับวิดีโอ:
+
+```tsx
+// ใช้ใน Remotion
+<ChessGame gameData={gameData} styleVariant="minimal-clean" speed="medium" />
+```
+
+**Available styles:**
+- `minimal-clean` - สะอาด เรียบง่าย (ค่าเริ่มต้น)
+- `sporty-esports` - สไตล์กีฬา (เตรียมไว้)
+- `retro-pixel` - สไตล์ 8-bit (เตรียมไว้)
+- `bold-impact` - ดูเด่นชัด (เตรียมไว้)
+
 ## 🛠 Tech Stack
 
 - **Video Engine:** Remotion (React-based video creation)
@@ -75,8 +93,12 @@ chess-video-editor/
 
 - **Resolution:** 1080 x 1920 (9:16 aspect ratio)
 - **Frame Rate:** 30 FPS
-- **Duration:** 2 วินาทีต่อ move
+- **Speed Presets:**
+  - `slow` - 1.5s/2.0s ต่อ move (สบายตา)
+  - `medium` - 0.8s/1.2s ต่อ move (ค่าเริ่มต้น)
+  - `fast` - 0.5s/0.8s ต่อ move (เร็ว)
 - **Format:** MP4 (H.264)
+- **Easing:** Smooth cubic easing สำหรับ animation หมาก
 
 ## 🤝 Contributing
 
