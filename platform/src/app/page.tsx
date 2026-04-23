@@ -261,6 +261,14 @@ export default function Home() {
               <p style={{ color: '#aaa', marginBottom: '8px' }}>
                 <strong style={{ color: '#fff' }}>จำนวน moves:</strong> {Math.ceil(result.gameData.moves.length / 2)} (ทั้งหมด {result.gameData.moves.length} ครั้งเดิน)
               </p>
+              {result.gameData.gameType && (
+                <p style={{ color: '#aaa', marginBottom: '8px' }}>
+                  <strong style={{ color: '#fff' }}>ชนิดเกม:</strong> {result.gameData.gameType}
+                  {result.gameData.timeControl && (
+                    <span style={{ color: '#666', fontSize: '14px' }}> ({result.gameData.timeControl})</span>
+                  )}
+                </p>
+              )}
               {result.gameData.opening && (
                 <p style={{ color: '#aaa' }}>
                   <strong style={{ color: '#fff' }}>Opening:</strong> {result.gameData.opening}
@@ -367,6 +375,32 @@ function parsePGNData(pgn: string) {
   const blackEloMatch = pgn.match(/\[BlackElo "(\d+)"\]/);
   const openingMatch = pgn.match(/\[Opening "([^"]+)"\]/);
   const resultMatch = pgn.match(/\[Result "([^"]+)"\]/);
+  const timeControlMatch = pgn.match(/\[TimeControl "([^"]+)"\]/);
+  const eventMatch = pgn.match(/\[Event "([^"]+)"\]/);
+  
+  // Parse TimeControl to determine game type
+  let gameType = 'Standard';
+  if (timeControlMatch) {
+    const tc = timeControlMatch[1];
+    if (tc.includes('180') || tc.includes('300')) {
+      gameType = '⚡ Blitz';
+    } else if (tc.includes('600') || tc.includes('900') || tc.includes('1200')) {
+      gameType = '⏱️ Rapid';
+    } else if (tc.includes('60') || tc.includes('30')) {
+      gameType = '🔥 Bullet';
+    } else if (tc.includes('86400') || tc.includes('43200')) {
+      gameType = '📅 Daily';
+    }
+  }
+  
+  // Also check Event field
+  if (eventMatch) {
+    const event = eventMatch[1].toLowerCase();
+    if (event.includes('blitz')) gameType = '⚡ Blitz';
+    else if (event.includes('rapid')) gameType = '⏱️ Rapid';
+    else if (event.includes('bullet')) gameType = '🔥 Bullet';
+    else if (event.includes('daily')) gameType = '📅 Daily';
+  }
   
   // Remove headers to get moves
   const movesText = pgn.replace(/\[.*?\]/g, '').trim();
@@ -394,6 +428,8 @@ function parsePGNData(pgn: string) {
     moves,
     opening: openingMatch ? openingMatch[1] : undefined,
     result: resultMatch ? resultMatch[1] : '*',
+    gameType,
+    timeControl: timeControlMatch ? timeControlMatch[1] : undefined,
     pgn,
   };
 }

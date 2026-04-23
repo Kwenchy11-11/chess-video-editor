@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     const platformDir = process.cwd();
     const rootDir = path.join(platformDir, '..');
     const tempDir = path.join(platformDir, 'temp');
-    const gameDataPath = path.join(tempDir, `game-${gameId}.json`);
+    const gameDataPath = path.join(tempDir, `${gameId}.json`);
     const outputDir = path.join(platformDir, 'public', 'videos');
     const outputPath = path.join(outputDir, `chess-game-${gameId}.mp4`);
 
@@ -46,7 +46,7 @@ export async function POST(request: Request) {
     }
 
     // Render video using Remotion CLI
-    const renderCommand = `cd "${rootDir}" && npx remotion render ChessGame "${outputPath}" --props="platform/temp/game-${gameId}.json"`;
+    const renderCommand = `cd "${rootDir}" && npx remotion render ChessGame "${outputPath}" --props="platform/temp/${gameId}.json" 2>&1`;
     
     console.log('Executing:', renderCommand);
     
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       // Check if video was created
       if (!fs.existsSync(outputPath)) {
         return NextResponse.json(
-          { error: 'Video file was not created' },
+          { error: 'Video file was not created', output: stdout, stderr },
           { status: 500 }
         );
       }
@@ -75,7 +75,10 @@ export async function POST(request: Request) {
     } catch (execError) {
       console.error('Render execution error:', execError);
       return NextResponse.json(
-        { error: 'Failed to render video: ' + (execError instanceof Error ? execError.message : 'Unknown error') },
+        { 
+          error: 'Failed to render video: ' + (execError instanceof Error ? execError.message : 'Unknown error'),
+          details: execError instanceof Error ? execError.stack : undefined
+        },
         { status: 500 }
       );
     }
