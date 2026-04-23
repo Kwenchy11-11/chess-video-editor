@@ -1,10 +1,10 @@
 import React from 'react';
-import { Composition } from 'remotion';
+import { Composition, getInputProps } from 'remotion';
 import { ChessGame } from './compositions/ChessGame';
 import { GameData } from './lib/types';
 
-// Sample data for development
-const sampleGame: GameData = {
+// Default sample data
+const defaultGame: GameData = {
   id: 'sample',
   white: { 
     username: 'FunDeeKubTiktok', 
@@ -17,18 +17,22 @@ const sampleGame: GameData = {
     color: 'black' 
   },
   moves: [
-    'e4', 'e5', 'Nc3', 'c5', 'Bc4', 'd6', 'd3', 'Nf6',
-    'a4', 'Nc6', 'Nxc5', 'dxc5', 'Ne2', 'O-O', 'O-O', 'h6',
-    'c3', 'Qe7', 'Kh1', 'a6', 'f4', 'Be6', 'fxe6', 'fxe6'
+    'e4', 'e5', 'Nf3', 'Nc6', 'Bb5', 'a6', 'Ba4', 'Nf6',
+    'O-O', 'Be7', 'Re1', 'b5', 'Bb3', 'd6', 'c3', 'O-O',
+    'h3', 'Nb8', 'd4', 'Nbd7', 'c4', 'c6', 'cxb5', 'axb5'
   ],
-  opening: 'Vienna Game',
+  opening: 'Ruy Lopez',
   result: '*',
-  pgn: '[White "FunDeeKubTiktok"][Black "zola069"] 1. e4 e5 2. Nc3 c5 3. Bc4 d6 4. d3 Nf6 5. a4 Nc6 6. Nxc5 dxc5 7. Ne2 O-O 8. O-O h6 9. c3 Qe7 10. Kh1 a6 11. f4 Be6 12. fxe6 fxe6',
+  pgn: '[White "FunDeeKubTiktok"][Black "zola069"] 1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 4. Ba4 Nf6 5. O-O Be7 6. Re1 b5 7. Bb3 d6 8. c3 O-O 9. h3 Nb8 10. d4 Nbd7 11. c4 c6 12. cxb5 axb5',
 };
 
 export const RemotionRoot: React.FC = () => {
+  // Get input props from Remotion (for dynamic rendering)
+  const inputProps = getInputProps() as { gameData?: GameData };
+  const gameData = inputProps?.gameData || defaultGame;
+  
   const framesPerMove = 60; // 2 seconds at 30fps
-  const totalFrames = sampleGame.moves.length * framesPerMove;
+  const totalFrames = gameData.moves.length * framesPerMove;
   
   return (
     <>
@@ -40,7 +44,7 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{
-          gameData: sampleGame,
+          gameData,
         }}
       />
     </>
