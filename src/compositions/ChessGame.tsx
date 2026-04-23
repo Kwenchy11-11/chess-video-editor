@@ -239,6 +239,135 @@ export const ChessGame: React.FC<ChessGameProps> = ({
           showEvaluation={true}
         />
       </div>
+      
+      {/* Evaluation Bar - outside scaled board */}
+      {currentMoveAnalysis && (
+        <div style={{
+          position: 'absolute',
+          right: 20,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 20,
+          height: scaledBoardSize * 0.8,
+          backgroundColor: '#222',
+          borderRadius: '4px',
+          overflow: 'hidden',
+          zIndex: 60,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+        }}>
+          {/* White advantage (top portion) */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: `${Math.max(5, Math.min(95, 50 + (currentMoveAnalysis.evaluation / 100)))}%`,
+            backgroundColor: '#fff',
+            transition: 'height 0.3s ease',
+          }} />
+          {/* Evaluation text */}
+          <div style={{
+            position: 'absolute',
+            bottom: 4,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            color: Math.abs(currentMoveAnalysis.evaluation) > 500 ? '#fff' : '#333',
+            whiteSpace: 'nowrap',
+          }}>
+            {currentMoveAnalysis.evaluation > 9000 
+              ? `M${Math.round((10000 - currentMoveAnalysis.evaluation) / 100)}` 
+              : currentMoveAnalysis.evaluation < -9000
+              ? `-M${Math.round((10000 + currentMoveAnalysis.evaluation) / 100)}`
+              : (currentMoveAnalysis.evaluation / 100).toFixed(1)}
+          </div>
+        </div>
+      )}
+      
+      {/* Move Classification Badge - outside scaled board */}
+      {currentMoveAnalysis && (
+        <div style={{
+          position: 'absolute',
+          top: 40,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 70,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          padding: '8px 16px',
+          borderRadius: '24px',
+        }}>
+          {/* Classification icon */}
+          <div style={{
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '18px',
+            fontWeight: 'bold',
+            backgroundColor: getClassificationColor(currentMoveAnalysis.classification),
+            color: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+          }}>
+            {getClassificationIcon(currentMoveAnalysis.classification)}
+          </div>
+          {/* Classification text */}
+          <span style={{
+            fontSize: '16px',
+            fontWeight: '600',
+            color: '#fff',
+            textTransform: 'capitalize',
+          }}>
+            {currentMoveAnalysis.classification}
+          </span>
+          {/* Evaluation */}
+          <span style={{
+            fontSize: '14px',
+            color: currentMoveAnalysis.evaluation > 0 ? '#4caf50' : currentMoveAnalysis.evaluation < 0 ? '#e53935' : '#aaa',
+            fontWeight: '500',
+          }}>
+            {currentMoveAnalysis.evaluation > 0 ? '+' : ''}{(currentMoveAnalysis.evaluation / 100).toFixed(1)}
+          </span>
+        </div>
+      )}
     </div>
   );
 };
+
+// Helper functions for classification display
+function getClassificationColor(classification: string): string {
+  const colors: Record<string, string> = {
+    'brilliant': '#1e88e5', // Blue
+    'best': '#4caf50',      // Green
+    'great': '#8bc34a',     // Light green
+    'excellent': '#9ccc65', // Yellow-green
+    'good': '#c0ca33',      // Yellow
+    'book': '#8d6e63',      // Brown
+    'inaccuracy': '#ff9800', // Orange
+    'mistake': '#f57c00',    // Dark orange
+    'blunder': '#e53935',    // Red
+    'miss': '#d32f2f',       // Dark red
+  };
+  return colors[classification] || '#757575';
+}
+
+function getClassificationIcon(classification: string): string {
+  const icons: Record<string, string> = {
+    'brilliant': '!!',
+    'best': '★',
+    'great': '!',
+    'excellent': '✓',
+    'good': '✓',
+    'book': '📖',
+    'inaccuracy': '?!',
+    'mistake': '?',
+    'blunder': '??',
+    'miss': '○',
+  };
+  return icons[classification] || '•';
+}
