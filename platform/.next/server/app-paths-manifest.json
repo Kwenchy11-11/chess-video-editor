@@ -1,1 +1,4 @@
-{}
+{
+  "/api/save-game/route": "app/api/save-game/route.js",
+  "/api/render/route": "app/api/render/route.js"
+}

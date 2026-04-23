@@ -3,7 +3,8 @@ import { useCurrentFrame, useVideoConfig } from 'remotion';
 import { Board } from '../components/Board';
 import { useChessGame } from '../hooks/useChessGame';
 import { VIDEO_WIDTH, VIDEO_HEIGHT, BOARD_SIZE, ENDING_PAUSE_FRAMES, SpeedPreset } from '../lib/constants';
-import { GameData } from '../lib/types';
+import { GameData, MoveAnalysis } from '../lib/types';
+import { useGameAnalysis, useMoveAnalysis } from '../hooks/useGameAnalysis';
 
 // Style variants - easy to add more later (Sporty, Retro, Bold)
 type StyleVariant = 'minimal-clean' | 'sporty-esports' | 'retro-pixel' | 'bold-impact';
@@ -161,7 +162,16 @@ export const ChessGame: React.FC<ChessGameProps> = ({
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
-  const { totalFrames, moveAnimations } = useChessGame(gameData, speed);
+  const { totalFrames, moveAnimations, getPositionAtFrame } = useChessGame(gameData, speed);
+  
+  // Get game analysis
+  const { analysis, isAnalyzing, progress: analysisProgress } = useGameAnalysis(gameData);
+  
+  // Get current move index
+  const { moveIndex } = getPositionAtFrame(frame);
+  
+  // Get analysis for current move
+  const currentMoveAnalysis = analysis?.moves[moveIndex] || null;
   
   // Get style config based on variant
   const style = styleConfigs[styleVariant];
@@ -196,6 +206,23 @@ export const ChessGame: React.FC<ChessGameProps> = ({
         fontFamily: style.fontFamily,
       }}
     >
+      {/* Analysis loading indicator */}
+      {isAnalyzing && (
+        <div style={{
+          position: 'absolute',
+          top: 20,
+          right: 20,
+          padding: '8px 16px',
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          borderRadius: '20px',
+          color: '#fff',
+          fontSize: '12px',
+          zIndex: 100,
+        }}>
+          Analyzing... {analysisProgress}%
+        </div>
+      )}
+      
       {/* Board with game end indicators */}
       <div style={{ 
         position: 'relative',
@@ -208,6 +235,8 @@ export const ChessGame: React.FC<ChessGameProps> = ({
           showWinner={isEndingPause && winner !== null}
           winnerColor={winnerColor}
           endingProgress={endingProgress}
+          currentMoveAnalysis={currentMoveAnalysis}
+          showEvaluation={true}
         />
       </div>
     </div>

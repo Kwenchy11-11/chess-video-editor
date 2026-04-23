@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-
-const execAsync = promisify(exec);
 
 export async function POST(request: Request) {
   try {
@@ -45,43 +42,113 @@ export async function POST(request: Request) {
       });
     }
 
-    // Render video using Remotion CLI
-    const renderCommand = `cd "${rootDir}" && npx remotion render ChessGame "${outputPath}" --props="platform/temp/${gameId}.json" 2>&1`;
+    // Read game data to pass as props
+    const gameData = JSON.parse(fs.readFileSync(gameDataPath, 'utf-8'));
     
-    console.log('Executing:', renderCommand);
-    
-    try {
-      const { stdout, stderr } = await execAsync(renderCommand, { 
-        timeout: 300000, // 5 minutes
-        maxBuffer: 1024 * 1024 * 10, // 10MB buffer
-      });
-      
-      console.log('Render stdout:', stdout);
-      if (stderr) console.log('Render stderr:', stderr);
+    // Create a temporary props file in the root directory for Remotion
+    // The props file should have the gameData at the root level
+    const propsFilePath = path.join(rootDir, `temp-props-${gameId}.json`);
+    fs.writeFileSync(propsFilePath, JSON.stringify({ gameData }));
 
-      // Check if video was created
-      if (!fs.existsSync(outputPath)) {
-        return NextResponse.json(
-          { error: 'Video file was not created', output: stdout, stderr },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        videoUrl: `/videos/chess-game-${gameId}.mp4`,
-        message: 'Video rendered successfully',
-        output: stdout,
-      });
-    } catch (execError) {
-      console.error('Render execution error:', execError);
-      return NextResponse.json(
-        { 
-          error: 'Failed to render video: ' + (execError instanceof Error ? execError.message : 'Unknown error'),
-          details: execError instanceof Error ? execError.stack : undefined
-        },
-        { status: 500 }
+    // Render video using Remotion CLI with spawn for better control
+    return new Promise((resolve) => {
+      const renderProcess = spawn(
+        'npx',
+        [
+          'remotion',
+          'render',
+          'ChessGame',
+          outputPath,
+          `--props=${propsFilePath}`,
+          '--log=verbose'
+        ],
+        {
+          cwd: rootDir,
+          timeout: 300000, // 5 minutes
+        }
       );
-    }
+
+      let stdout = '';
+      let stderr = '';
+
+      renderProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+        console.log('Render stdout:', data.toString());
+      });
+
+      renderProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+        console.log('Render stderr:', data.toString());
+      });
+
+      renderProcess.on('close', (code) => {
+        // Clean up temp props file
+        try {
+          if (fs.existsSync(propsFilePath)) {
+            fs.unlinkSync(propsFilePath);
+          }
+        } catch (e) {
+          console.error('Failed to clean up props file:', e);
+        }
+
+        if (code !== 0) {
+          resolve(
+            NextResponse.json(
+              { 
+                error: 'Video rendering failed',
+                exitCode: code,
+                stderr: stderr.slice(-2000), // Last 2000 chars
+                stdout: stdout.slice(-2000),
+              },
+              { status: 500 }
+            )
+          );
+          return;
+        }
+
+        // Check if video was created
+        if (!fs.existsSync(outputPath)) {
+          resolve(
+            NextResponse.json(
+              { 
+                error: 'Video file was not created',
+                output: stdout,
+                stderr 
+              },
+              { status: 500 }
+            )
+          );
+          return;
+        }
+
+        resolve(
+          NextResponse.json({
+            videoUrl: `/videos/chess-game-${gameId}.mp4`,
+            message: 'Video rendered successfully',
+          })
+        );
+      });
+
+      renderProcess.on('error', (error) => {
+        // Clean up temp props file
+        try {
+          if (fs.existsSync(propsFilePath)) {
+            fs.unlinkSync(propsFilePath);
+          }
+        } catch (e) {
+          console.error('Failed to clean up props file:', e);
+        }
+
+        resolve(
+          NextResponse.json(
+            { 
+              error: 'Failed to start render process: ' + error.message,
+            },
+            { status: 500 }
+          )
+        );
+      });
+    });
 
   } catch (error) {
     console.error('API error:', error);

@@ -29,3 +29,23 @@ export interface MoveAnimation {
 export interface ChessCompositionProps {
   gameData: GameData;
 }
+
+// Move classification types for Game Review feature
+export type MoveClassification = 
+  | 'brilliant' | 'best' | 'great' | 'excellent' | 'good' 
+  | 'book' | 'inaccuracy' | 'mistake' | 'blunder' | 'miss';
+
+export interface MoveAnalysis {
+  moveIndex: number;
+  san: string;
+  classification: MoveClassification;
+  evaluation: number; // centipawns (positive = white advantage)
+  centipawnLoss: number;
+  bestMove: string;
+}
+
+export interface GameAnalysis {
+  moves: MoveAnalysis[];
+  whiteAccuracy: number;
+  blackAccuracy: number;
+}
