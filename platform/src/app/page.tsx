@@ -5,14 +5,16 @@ import { useState } from 'react';
 export default function Home() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderOutput, setRenderOutput] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setVideoUrl(null);
+    setResult(null);
 
     try {
       const response = await fetch('/api/generate', {
@@ -23,15 +25,48 @@ export default function Home() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to generate video');
+        throw new Error(data.error || 'Failed to prepare game data');
       }
 
       const data = await response.json();
-      setVideoUrl(data.videoUrl);
+      setResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRender = async () => {
+    if (!result?.renderCommand) return;
+    
+    setRendering(true);
+    setRenderOutput('⏳ กำลังสร้างวิดีโอ... อาจใช้เวลา 1-2 นาที\n');
+    
+    try {
+      // Execute render command
+      const response = await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: result.gameId }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Render failed');
+      }
+      
+      const data = await response.json();
+      setRenderOutput(prev => prev + '\n✅ สร้างวิดีโอสำเร็จ!\n');
+      
+      // Update result with video URL
+      setResult((prev: any) => ({
+        ...prev,
+        videoUrl: data.videoUrl,
+      }));
+    } catch (err) {
+      setRenderOutput(prev => prev + '\n❌ เกิดข้อผิดพลาด: ' + (err instanceof Error ? err.message : 'Unknown error') + '\n');
+    } finally {
+      setRendering(false);
     }
   };
 
@@ -47,7 +82,7 @@ export default function Home() {
       fontFamily: 'system-ui, -apple-system, sans-serif',
     }}>
       <div style={{
-        maxWidth: '600px',
+        maxWidth: '700px',
         width: '100%',
         textAlign: 'center',
       }}>
@@ -107,7 +142,7 @@ export default function Home() {
               transition: 'transform 0.2s, background-color 0.2s',
             }}
           >
-            {loading ? '⏳ กำลังสร้างวิดีโอ...' : '🎬 สร้างวิดีโอ'}
+            {loading ? '⏳ กำลังเตรียมข้อมูล...' : '📥 เตรียมข้อมูลเกม'}
           </button>
         </form>
 
@@ -123,42 +158,123 @@ export default function Home() {
           </div>
         )}
 
-        {videoUrl && (
+        {result && (
           <div style={{
             marginTop: '30px',
             padding: '24px',
-            backgroundColor: '#7cb34233',
+            backgroundColor: '#ffffff11',
             borderRadius: '16px',
+            textAlign: 'left',
           }}>
-            <h2 style={{ color: '#7cb342', marginBottom: '16px' }}>
-              ✅ สร้างวิดีโอสำเร็จ!
+            <h2 style={{ color: '#7cb342', marginBottom: '16px', textAlign: 'center' }}>
+              ✅ เตรียมข้อมูลสำเร็จ!
             </h2>
-            <video
-              src={videoUrl}
-              controls
-              style={{
-                width: '100%',
-                maxWidth: '300px',
+            
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: '#aaa', marginBottom: '8px' }}>
+                <strong style={{ color: '#fff' }}>ผู้เล่นขาว:</strong> {result.gameData.white.username} ({result.gameData.white.rating})
+              </p>
+              <p style={{ color: '#aaa', marginBottom: '8px' }}>
+                <strong style={{ color: '#fff' }}>ผู้เล่นดำ:</strong> {result.gameData.black.username} ({result.gameData.black.rating})
+              </p>
+              <p style={{ color: '#aaa', marginBottom: '8px' }}>
+                <strong style={{ color: '#fff' }}>จำนวน moves:</strong> {result.gameData.moves.length}
+              </p>
+              {result.gameData.opening && (
+                <p style={{ color: '#aaa' }}>
+                  <strong style={{ color: '#fff' }}>Opening:</strong> {result.gameData.opening}
+                </p>
+              )}
+            </div>
+
+            {!result.videoUrl ? (
+              <>
+                <button
+                  onClick={handleRender}
+                  disabled={rendering}
+                  style={{
+                    width: '100%',
+                    padding: '16px 32px',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    borderRadius: '12px',
+                    border: 'none',
+                    backgroundColor: rendering ? '#555' : '#ff6b6b',
+                    color: '#fff',
+                    cursor: rendering ? 'not-allowed' : 'pointer',
+                    marginBottom: '20px',
+                  }}
+                >
+                  {rendering ? '⏳ กำลังสร้างวิดีโอ...' : '🎬 สร้างวิดีโอ'}
+                </button>
+
+                {renderOutput && (
+                  <pre style={{
+                    backgroundColor: '#000',
+                    padding: '16px',
+                    borderRadius: '8px',
+                    color: '#0f0',
+                    fontSize: '14px',
+                    overflow: 'auto',
+                    maxHeight: '200px',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                  }}>
+                    {renderOutput}
+                  </pre>
+                )}
+
+                <div style={{
+                  marginTop: '20px',
+                  padding: '16px',
+                  backgroundColor: '#00000055',
+                  borderRadius: '8px',
+                }}>
+                  <p style={{ color: '#888', fontSize: '14px', marginBottom: '8px' }}>
+                    หรือรันคำสั่งนี้ใน Terminal:
+                  </p>
+                  <code style={{
+                    display: 'block',
+                    padding: '12px',
+                    backgroundColor: '#1a1a2e',
+                    borderRadius: '6px',
+                    color: '#7cb342',
+                    fontSize: '12px',
+                    wordBreak: 'break-all',
+                  }}>
+                    {result.renderCommand}
+                  </code>
+                </div>
+              </>
+            ) : (
+              <div style={{
+                marginTop: '20px',
+                padding: '20px',
+                backgroundColor: '#7cb34233',
                 borderRadius: '12px',
-                marginBottom: '16px',
-              }}
-            />
-            <br />
-            <a
-              href={videoUrl}
-              download
-              style={{
-                display: 'inline-block',
-                padding: '12px 24px',
-                backgroundColor: '#7cb342',
-                color: '#fff',
-                textDecoration: 'none',
-                borderRadius: '8px',
-                fontWeight: 'bold',
-              }}
-            >
-              ⬇️ ดาวน์โหลดวิดีโอ
-            </a>
+                textAlign: 'center',
+              }}>
+                <h3 style={{ color: '#7cb342', marginBottom: '16px' }}>
+                  🎉 สร้างวิดีโอสำเร็จ!
+                </h3>
+                <a
+                  href={result.videoUrl}
+                  download
+                  style={{
+                    display: 'inline-block',
+                    padding: '16px 32px',
+                    backgroundColor: '#7cb342',
+                    color: '#fff',
+                    textDecoration: 'none',
+                    borderRadius: '12px',
+                    fontWeight: 'bold',
+                    fontSize: '18px',
+                  }}
+                >
+                  ⬇️ ดาวน์โหลดวิดีโอ
+                </a>
+              </div>
+            )}
           </div>
         )}
 
@@ -174,8 +290,8 @@ export default function Home() {
             <li>เข้าไปที่ <a href="https://chess.com" target="_blank" style={{ color: '#7cb342' }}>Chess.com</a></li>
             <li>เปิดเกมที่ต้องการ (ต้องเป็นเกม public)</li>
             <li>คัดลอก URL จาก address bar</li>
-            <li>วางลงในช่องด้านบน แล้วกด "สร้างวิดีโอ"</li>
-            <li>รอประมาณ 30-60 วินาที</li>
+            <li>วางลงในช่องด้านบน แล้วกด "เตรียมข้อมูลเกม"</li>
+            <li>กด "สร้างวิดีโอ" และรอ 1-2 นาที</li>
             <li>ดาวน์โหลดและอัพโหลดลง TikTok!</li>
           </ol>
         </div>
